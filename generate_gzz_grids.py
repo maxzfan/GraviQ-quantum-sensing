@@ -1,7 +1,3 @@
-"""
-Generate Gzz (quantum gravity correlation) grids for all density grids in training_data.
-Uses Ramsey pulse sequence simulation with phase damping.
-"""
 import numpy as np
 import os
 from tqdm import tqdm
@@ -18,7 +14,6 @@ except ImportError:
 
 
 def ramsey_circuit(t):
-    """Create Ramsey pulse sequence circuit"""
     qc = QuantumCircuit(1, 1)
     qc.h(0)
     qc.delay(int(t * 1e9), 0, unit="ns")
@@ -28,34 +23,23 @@ def ramsey_circuit(t):
 
 
 def damping_probability(rho, t):
-    """Convert density to phase damping probability"""
     return 1 - np.exp(-rho * t)
 
 
 def compute_Gzz_at(rho_value, t, backend, shots=1000):
-    """
-    Compute Gzz for a single grid point using Qiskit simulation.
-    Reduced shots for faster computation.
-    """
-    # Build noise channel
     p = damping_probability(rho_value, t)
-    p = np.clip(p, 0, 1)  # Ensure valid probability
+    p = np.clip(p, 0, 1)  # ensure valid probability
     dephasing = phase_damping_error(p)
     
-    # Create noise model
     noise_model = NoiseModel()
-    # Add error to qubit 0 for id and delay gates
     noise_model.add_quantum_error(dephasing, ["id", "delay"], [0])
     
-    # Build circuit
     qc = ramsey_circuit(t)
     qc = transpile(qc, backend)
     
-    # Run simulation
     result = backend.run(qc, noise_model=noise_model, shots=shots).result()
     counts = result.get_counts()
     
-    # Compute expectation value <Z> = P(0) - P(1)
     P0 = counts.get('0', 0) / shots
     P1 = counts.get('1', 0) / shots
     Gzz = P0 - P1
@@ -64,24 +48,11 @@ def compute_Gzz_at(rho_value, t, backend, shots=1000):
 
 
 def density_to_gzz_grid(density_grid, t_evolution=30e-6, shots=500):
-    """
-    Convert entire density grid to Gzz grid using Qiskit simulation.
-    
-    Args:
-        density_grid: (N, M) array of density values
-        t_evolution: Evolution time in seconds
-        shots: Number of quantum shots per pixel (lower = faster but noisier)
-    
-    Returns:
-        Gzz_grid: (N, M) array of Gzz values
-    """
     N, M = density_grid.shape
     Gzz_grid = np.zeros((N, M))
     
-    # Create backend once
-    backend = AerSimulator()
+    backend = AerSimulator() # no ibm backend
     
-    # Progress bar for entire grid
     total_pixels = N * M
     with tqdm(total=total_pixels, desc="Computing Gzz", unit="px") as pbar:
         for i in range(N):
@@ -162,3 +133,4 @@ if __name__ == "__main__":
     else:
         # Process all samples
         process_training_data(args.data_dir, args.t_evolution, args.shots)
+
